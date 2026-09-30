@@ -32,14 +32,6 @@ Sistema web para la gestión integral de obras de construcción: proyectos, comp
 ---
 
 ## Estructura del repositorio
-
-```
-/prototipo        — Archivos HTML/CSS/JS del prototipo navegable
-/documentacion    — Especificación Final, Matrices de Requerimientos y Trazabilidad
-/diagramas        — Diagramas AS-IS, TO-BE y ER (imagen + archivo MySQL Workbench)
-/minutas          — Minutas de entrevistas iniciales y validación del prototipo
-```
-
 ---
 
 ## Entregables incluidos
