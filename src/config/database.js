@@ -1,17 +1,8 @@
 const mysql  = require('mysql2/promise');
 const bcrypt = require('bcryptjs');
-require('dotenv').config();
+const config = require('../../config');
 
-const pool = mysql.createPool({
-  host: process.env.DB_HOST,
-  port: process.env.DB_PORT,
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  database: process.env.DB_NAME,
-  waitForConnections: true,
-  connectionLimit: 10,
-  timezone: '+00:00'
-});
+const pool = mysql.createPool(config.db);
 
 async function initDB() {
   const c = await pool.getConnection();
