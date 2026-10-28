@@ -5,6 +5,15 @@ const config = require('../../config');
 const pool = mysql.createPool(config.db);
 
 /**
+ * Describe el destino de conexion sin exponer credenciales.
+ * Se usa en los errores para saber si se uso DATABASE_URL o las variables DB_*.
+ */
+function describeDatabaseTarget() {
+  const ssl = config.db.ssl ? ' SSL' : '';
+  return `${config.databaseSource}: ${config.db.host}:${config.db.port}/${config.db.database}${ssl}`;
+}
+
+/**
  * Agrega 'borrador' al ENUM de PROYECTO.estado solo si aun no existe.
  * Permite actualizar bases creadas antes de la Tarea 2 sin recrear tablas.
  */
@@ -31,7 +40,14 @@ async function ensureProyectoEstadoBorrador(conn) {
 }
 
 async function initDB() {
-  const c = await pool.getConnection();
+  let c;
+  try {
+    c = await pool.getConnection();
+  } catch (error) {
+    error.message = `No se pudo conectar a MySQL (${describeDatabaseTarget()}): ${error.message}`;
+    throw error;
+  }
+
   try {
     /* ─── TABLAS ORIGINALES ─── */
     await c.query(`CREATE TABLE IF NOT EXISTS USUARIO (
@@ -433,4 +449,4 @@ async function initDB() {
   } finally { c.release(); }
 }
 
-module.exports = { pool, initDB };
+module.exports = { pool, initDB, describeDatabaseTarget };

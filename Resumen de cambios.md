@@ -1,12 +1,12 @@
 # Resumen de cambios — PROTOCEM
 
-> Documento acumulativo. Esta versión documenta las **Tareas 1 y 2**. Las Tareas 3 y 4 se agregarán al finalizar cada una.
+> Documento acumulativo. Esta versión documenta las **Tareas 1, 2 y 3**. La Tarea 4 se agregará al finalizar.
 
 **Fecha:** 27 de octubre de 2026
 
 **Rama:** `develop`
 
-**Alcance de esta versión:** Tarea 1 — Refactorización a arquitectura MVC por capas; Tarea 2 — Importador de presupuestos Opus.
+**Alcance de esta versión:** Tarea 1 — Refactorización a arquitectura MVC por capas; Tarea 2 — Importador de presupuestos Opus; Tarea 3 — Configuración de entorno local y nube.
 
 ---
 
@@ -364,7 +364,7 @@ La base temporal fue eliminada al terminar.
 ## 9. Pendientes para las siguientes tareas
 
 - **Tarea 2:** completada — importador Excel de Opus, `multer`, `xlsx`, `uploads/`, rutas `/api/importacion/*`, estado `borrador` y vista frontend.
-- **Tarea 3:** `.env.example` documentado y modo local vs nube.
+- **Tarea 3:** completada — `.env.example`, conexión por `DATABASE_URL` y SSL para nube.
 - **Tarea 4:** `Procfile`, `render.yaml`, `railway.json` y README de despliegue.
 
 ---
@@ -490,7 +490,139 @@ Todas las rutas usan `auth` + `requireRol('administrador')`. Sin token responden
 
 ### 11.9 Notas y pendientes
 
-- **Tarea 3:** `.env.example` documentado y modo local vs nube.
+- **Tarea 3:** completada — `.env.example`, conexión por `DATABASE_URL` y SSL para nube.
 - **Tarea 4:** `Procfile`, `render.yaml`, `railway.json` y README de despliegue.
 - El importador no crea `PARTIDA` ni `CONCEPTO`; los materiales quedan como productos y cotizaciones del proveedor técnico.
 - El límite de filas del parser es configurable con `IMPORT_MAX_ROWS` (5000 por defecto).
+
+---
+
+## 12. Tarea 3 — Configuración de entorno (local y nube)
+
+### 12.1 Objetivo
+
+Centralizar la configuración en variables de entorno, documentar todos los valores necesarios y permitir que la aplicación se conecte a MySQL de dos formas:
+
+- **Local:** parámetros individuales (`DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`).
+- **Nube:** una URL unificada (`DATABASE_URL`), con soporte de SSL.
+
+### 12.2 Archivo `.env.example`
+
+Se creó `.env.example` en la raíz con valores de ejemplo seguros y comentarios para cada variable:
+
+| Variable | Valor de ejemplo | Descripción |
+|---|---|---|
+| `NODE_ENV` | `development` | Entorno de ejecución (`development`, `production`, `test`). |
+| `PORT` | `3000` | Puerto HTTP. |
+| `DB_HOST` | `127.0.0.1` | Host de MySQL local. |
+| `DB_PORT` | `3306` | Puerto de MySQL. |
+| `DB_USER` | `root` | Usuario de MySQL. |
+| `DB_PASSWORD` | *(vacío)* | Contraseña local; no se versiona. |
+| `DB_NAME` | `protocem_db` | Base de datos. |
+| `DB_POOL_SIZE` | `10` | Conexiones del pool. |
+| `DATABASE_URL` | *(comentado)* | URL unificada; tiene prioridad sobre `DB_*`. |
+| `DB_SSL` | `false` | Activa SSL (`true`, `required`, `verify-ca`, `verify-identity`). |
+| `DB_SSL_REJECT_UNAUTHORIZED` | `true` | Valida el certificado del servidor. |
+| `DB_SSL_CA` | *(comentado)* | Ruta al CA del proveedor. |
+| `JWT_SECRET` | `dev-only-cambia-esta-clave-antes-de-produccion` | Clave de firma; en producción se rechaza el ejemplo o una clave menor a 32 caracteres. |
+| `JWT_EXPIRES_IN` | `8h` | Vigencia del token. |
+| `BCRYPT_ROUNDS` | `10` | Costo de bcrypt. |
+| `CORS_ORIGIN` | `*` | Origen permitido; en producción, lista separada por comas. |
+| `UPLOADS_MAX_SIZE` | `10485760` | Límite del Excel (10 MB). |
+| `IMPORT_PREVIEW_TTL_MS` | `3600000` | TTL de la vista previa (1 hora). |
+| `IMPORT_MAX_ROWS` | `5000` | Filas máximas del parser. |
+| `OPUS_DATA_PATH` | *(comentado)* | Ruta opcional para `scripts/import-opus.js`. |
+
+### 12.3 Conexión local vs. nube
+
+**Local (parámetros individuales):**
+
+```dotenv
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_USER=root
+DB_PASSWORD=
+DB_NAME=protocem_db
+DB_SSL=false
+```
+
+**Nube (URL unificada):**
+
+```dotenv
+DATABASE_URL=mysql://usuario:contrasena@host:3306/protocem_db?ssl=true
+```
+
+`DATABASE_URL` tiene prioridad sobre `DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD` y `DB_NAME`. El parser acepta `mysql://` y `mysql2://`, contraseñas codificadas y estos parámetros de SSL: `ssl`, `sslmode`, `ssl-mode` y `ssl_mode`.
+
+### 12.4 Soporte SSL
+
+- `DB_SSL=true` o `required`: activa TLS.
+- `DB_SSL=verify-ca`: valida el CA sin verificar el nombre del host.
+- `DB_SSL=verify-identity`: valida CA y nombre del host.
+- `DB_SSL_REJECT_UNAUTHORIZED` controla la validación del certificado; por defecto es `true`.
+- `DB_SSL_CA` acepta una ruta relativa/absoluta al PEM o el PEM directamente en la variable.
+- La URL también acepta JSON, por ejemplo `?ssl={"rejectUnauthorized":false}`.
+
+### 12.5 Archivos creados
+
+- `.env.example`
+
+### 12.6 Archivos modificados
+
+- `config.js`: parseo de `DATABASE_URL`, SSL configurable, validación de `JWT_SECRET` en producción, lectura explícita del `.env` de la raíz y origen de configuración (`databaseSource`).
+- `src/config/database.js`: mensaje de error de conexión con host, base de datos, origen y estado SSL.
+- `.gitignore`: `.env`, `.env.*` ignorados y `.env.example` conservado.
+- `Resumen de cambios.md`: este documento.
+
+### 12.7 Verificación realizada
+
+| Comprobación | Resultado |
+|---|---|
+| `node --check config.js` | OK |
+| `node --check src/config/database.js` | OK |
+| `node --check server.js` | OK |
+| `node --check src/app.js` | OK |
+| Configuración con parámetros individuales | Host, puerto, usuario, contraseña, base y pool correctos |
+| Configuración con `DATABASE_URL` | URL parseada y prioridad sobre `DB_*` verificada |
+| `DATABASE_URL` con `?ssl=true` | SSL activado con `rejectUnauthorized: true` |
+| `DATABASE_URL` con `?sslmode=require` | SSL activado |
+| `DATABASE_URL` con `?ssl={"rejectUnauthorized":false}` | JSON respetado |
+| `DATABASE_URL` con esquema `mysql2://` | Aceptado |
+| `DB_SSL=true` + `DB_SSL_REJECT_UNAUTHORIZED=false` | SSL activado sin validación estricta |
+| `DB_SSL=verify-ca` | Validación de CA y `checkServerIdentity` configurados |
+| `DB_SSL_CA` con archivo PEM | Cargado correctamente |
+| `DB_SSL_CA` inexistente | Error claro de configuración |
+| `DATABASE_URL` inválida | Error claro de configuración |
+| Esquema distinto de MySQL | Error claro de configuración |
+| `DB_SSL` con valor desconocido | Error claro de configuración |
+| `JWT_SECRET` de ejemplo o corto en producción | Rechazado |
+| `.env.example` parseado por `dotenv` | 17 variables activas, sin `DATABASE_URL` activo |
+| `.env.example` sin secretos reales | Confirmado |
+| `.env` ignorado por Git | Confirmado |
+| `.env.example` versionable | Confirmado con `git add -n` |
+| Conexión real con `DB_*` | `SELECT 1` correcto |
+| Conexión real con `DATABASE_URL` | `SELECT 1` correcto |
+| Arranque con `DATABASE_URL` en puerto 3102 | `GET /` → 200 y login con token emitido; puerto liberado |
+| `npm test` | **25/25** |
+
+### 12.8 Cómo usar
+
+1. Copiar `.env.example` a `.env`.
+2. Para local, mantener `DB_*` y `DB_SSL=false`.
+3. Para nube, definir `DATABASE_URL` y `DB_SSL=true` (o `required`).
+4. Si el proveedor requiere CA, definir `DB_SSL_CA`.
+5. Generar un `JWT_SECRET` real:
+
+   ```bash
+   node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
+   ```
+
+6. Ejecutar `npm start`.
+
+> `.env` está ignorado por Git. Nunca se versionan credenciales reales.
+
+### 12.9 Notas y pendientes
+
+- **Tarea 4:** `Procfile`, `render.yaml`, `railway.json` y README de despliegue.
+- En producción se recomienda `NODE_ENV=production`, `DB_SSL=true` y `CORS_ORIGIN` restringido.
+- Si el proveedor de nube entrega la URL con parámetros adicionales, solo se interpretan los relacionados con SSL; el resto se ignora.
