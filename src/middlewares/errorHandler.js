@@ -19,6 +19,22 @@ function errorHandler(err, req, res, next) {
     message = 'JSON invalido en el cuerpo de la peticion';
   }
 
+  // Errores de Multer al subir archivos.
+  if (err.name === 'MulterError') {
+    status = err.code === 'LIMIT_FILE_SIZE' ? 413 : 400;
+
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      const maxMb = Math.round(config.uploadsMaxSize / (1024 * 1024));
+      message = `El archivo supera el limite de ${maxMb} MB`;
+    } else if (err.code === 'LIMIT_UNEXPECTED_FILE') {
+      message = 'Campo de archivo invalido. Usa el campo "archivo".';
+    } else if (err.code === 'LIMIT_FILE_COUNT') {
+      message = 'Solo se permite un archivo por importacion.';
+    } else {
+      message = 'Error al procesar el archivo subido.';
+    }
+  }
+
   // Errores de MySQL que representan datos invalidos, no fallas del servidor.
   if (err.code === 'ER_DUP_ENTRY') {
     status = 400;

@@ -1,10 +1,12 @@
 # Resumen de cambios — PROTOCEM
 
-> Documento acumulativo. En esta primera versión se documenta únicamente la **Tarea 1**. Las Tareas 2, 3 y 4 se agregarán al finalizar cada una.
+> Documento acumulativo. Esta versión documenta las **Tareas 1 y 2**. Las Tareas 3 y 4 se agregarán al finalizar cada una.
 
-**Fecha:** 26 de octubre de 2026  
-**Rama:** `develop`  
-**Alcance de esta versión:** Tarea 1 — Refactorización a arquitectura MVC por capas.
+**Fecha:** 27 de octubre de 2026
+
+**Rama:** `develop`
+
+**Alcance de esta versión:** Tarea 1 — Refactorización a arquitectura MVC por capas; Tarea 2 — Importador de presupuestos Opus.
 
 ---
 
@@ -361,7 +363,7 @@ La base temporal fue eliminada al terminar.
 
 ## 9. Pendientes para las siguientes tareas
 
-- **Tarea 2:** importador Excel de Opus, `multer`, `xlsx`, `uploads/`, rutas `/api/importacion/*`, estado `borrador` y vista frontend.
+- **Tarea 2:** completada — importador Excel de Opus, `multer`, `xlsx`, `uploads/`, rutas `/api/importacion/*`, estado `borrador` y vista frontend.
 - **Tarea 3:** `.env.example` documentado y modo local vs nube.
 - **Tarea 4:** `Procfile`, `render.yaml`, `railway.json` y README de despliegue.
 
@@ -385,3 +387,110 @@ Usuario administrador:
 ```text
 admin@protocem.mx / admin123
 ```
+
+---
+
+## 11. Tarea 2 — Importador de presupuestos Opus
+
+### 11.1 Objetivo
+
+Permitir que un administrador suba un presupuesto exportado de Opus en Excel, revise y ajuste los datos detectados y lo conserve como proyecto en estado `borrador`, sin crear partidas ni conceptos.
+
+### 11.2 Alcance implementado
+
+- Opción **Importar desde Opus** en el sidebar, visible únicamente para administradores.
+- Carga de archivos `.xlsx` y `.xls` con Multer en memoria y límite configurable (`UPLOADS_MAX_SIZE`, 10 MB por defecto).
+- Parser tolerante a variantes de encabezados, metadatos, fechas y números mexicanos.
+- Vista previa temporal en `uploads/importaciones/<uuid>.json` con TTL configurable (`IMPORT_PREVIEW_TTL_MS`, 1 hora por defecto).
+- Confirmación transaccional: proyecto `borrador` → proveedor técnico → un `PRODUCTO` por material → una `COTIZACION` por producto.
+- Descarte de la vista previa temporal o del proyecto borrador, con limpieza en orden `COTIZACION → PRODUCTO sin referencias → PROVEEDOR → PROYECTO`.
+- UI con drag & drop, tabla de materiales, resumen de presupuesto y confianza, advertencias, edición de nombre/fecha/presupuesto/zona y acciones **Conservar proyecto** / **Descartar**.
+- Estado `borrador` agregado al ENUM de `PROYECTO.estado` mediante una migración idempotente.
+- Sin cambios en `PARTIDA`, `CONCEPTO` ni en la estructura de presupuestos.
+
+### 11.3 Endpoints
+
+| Método | Ruta | Cuerpo | Respuesta |
+|---|---|---|---|
+| `POST` | `/api/importacion/preview` | `multipart/form-data`, campo `archivo` | `201 { id, archivo, expira_en, ttl_ms, preview }` |
+| `POST` | `/api/importacion/confirmar` | `{ id, nombre_obra?, fecha_inicio?, presupuesto_total?, zona? }` | `201 { id_proyecto, id_proveedor, estado: 'borrador', materiales_importados, total_importado }` |
+| `DELETE` | `/api/importacion/:id` | UUID del preview o id numérico del proyecto borrador | `200 { message, ... }` |
+
+Todas las rutas usan `auth` + `requireRol('administrador')`. Sin token responden `401`; con un rol distinto responden `403`.
+
+### 11.4 Archivos creados
+
+- `src/utils/opusParser.js`
+- `src/middlewares/uploadExcel.js`
+- `src/repositories/importacion.repository.js`
+- `src/services/importacion.service.js`
+- `src/controllers/importacion.controller.js`
+- `src/routes/importacion.routes.js`
+- `test/opusParser.test.js`
+- `public/js/pages/importacion.js`
+- `uploads/.gitkeep`
+- `uploads/importaciones/.gitkeep`
+
+### 11.5 Archivos modificados
+
+- `config.js`: `importPreviewDir`, `importPreviewTtlMs` e `importMaxRows`.
+- `package.json` y `package-lock.json`: dependencia `multer` y script `npm test`.
+- `src/config/database.js`: ENUM `borrador` y migración idempotente.
+- `src/middlewares/errorHandler.js`: traducción de errores de Multer.
+- `src/routes/index.js`: registro de `/api/importacion`.
+- `.gitignore`: exclusión de los temporales de importación y conservación de los `.gitkeep`.
+- `public/index.html`: opción del sidebar y carga de `importacion.js`.
+- `public/js/app.js`: registro de la vista, guard de administrador y visibilidad correcta de `.nav-admin`.
+- `public/js/utils.js`: `estadoBadge` pinta `borrador`.
+- `public/css/app.css`: estilos de drop zone, resumen, tabla, advertencias, acciones y badge `borrador`.
+- `Resumen de cambios.md`: este documento.
+
+### 11.6 Decisiones de diseño
+
+- **Proveedor técnico por importación:** `empresa = 'IMPORTACION_OPUS:<id_proyecto>'` y `especialidad = 'importacion_opus'`. Así cada proyecto conserva sus propias cotizaciones y el descarte no toca datos de otros proyectos.
+- **Vista previa temporal:** el Excel nunca se guarda en disco; solo se persiste el JSON parseado. El cliente recibe un UUID para confirmar o descartar.
+- **Confirmación transaccional:** si falla cualquier inserción, no queda ningún registro parcial. El preview se conserva si la transacción falla para permitir reintentos.
+- **Descarte seguro:** un proyecto solo se elimina si sigue en `borrador` y no tiene compras ni salidas. Los productos solo se eliminan si ya no tienen cotizaciones, compras, salidas ni referencias en APU.
+- **Validaciones de confirmación:** nombre ≤ 200 caracteres, fecha real, presupuesto ≥ 0, zona válida (`Norte`, `Frontera`, `Turístico`, `Centro`, `Sur`) y recálculo de materiales.
+- **Doble confirmación:** bloqueo en memoria por UUID para evitar solicitudes simultáneas.
+- **Frontend:** se reutiliza el patrón de páginas globales (`renderX`) y los helpers existentes. El upload usa `fetch` manual porque `API.post` solo envía JSON; la confirmación y el descarte usan `API.post` / `API.delete`.
+- **Acceso:** además de ocultar la opción del sidebar, `navigate('importacion')` valida el rol para impedir el acceso desde consola.
+
+### 11.7 Verificación realizada
+
+| Comprobación | Resultado |
+|---|---|
+| `node --check` de parser, repositorio, servicio, controlador, rutas y frontend | OK |
+| `require('./src/app')` | OK |
+| `npm test` | **25/25 pruebas del parser** |
+| Integración HTTP + BD del backend | **48/48 comprobaciones** |
+| `npm start` en puerto 3101 | Arrancó correctamente; puerto liberado al terminar |
+| Flujo UI como administrador | Login, sidebar visible, drag & drop, preview, edición, confirmación y redirección a Proyectos |
+| Persistencia del flujo UI | Proyecto `borrador`, proveedor técnico, 3 productos y 3 cotizaciones verificados en BD |
+| Badge del proyecto importado | `badge-borrador` renderizado correctamente en Proyectos |
+| Descarte desde la UI | Vista previa eliminada, drop zone restaurada y sin proyecto creado |
+| Usuario sin permisos | Opción oculta y `navigate('importacion')` bloqueado con aviso |
+| Archivo no permitido | Rechazado en el cliente sin abandonar la drop zone |
+| Errores de consola del navegador | 0 |
+| Limpieza posterior | Sin proyectos, proveedores, productos, cotizaciones ni temporales de prueba |
+
+> No se dispone de un `.xlsx` real exportado por Opus. Las pruebas se hicieron con fixtures sintéticos que cubren metadatos, materiales, subtotales, advertencias, formatos numéricos y fechas.
+
+### 11.8 Cómo usar la importación
+
+1. Iniciar sesión con un usuario administrador.
+2. Abrir **Importar desde Opus** en el sidebar.
+3. Arrastrar el archivo `.xlsx`/`.xls` a la zona de carga o hacer clic para seleccionarlo.
+4. Revisar materiales, presupuesto, confianza y advertencias.
+5. Ajustar nombre de obra, fecha de inicio, presupuesto y zona si hace falta.
+6. Pulsar **Conservar proyecto** para crear el proyecto `borrador` y volver a Proyectos.
+7. Pulsar **Descartar** para eliminar la vista previa temporal y empezar de nuevo.
+
+> La vista previa se mantiene en memoria del navegador. Si se recarga la página, hay que volver a subir el archivo; el temporal anterior expira automáticamente por TTL.
+
+### 11.9 Notas y pendientes
+
+- **Tarea 3:** `.env.example` documentado y modo local vs nube.
+- **Tarea 4:** `Procfile`, `render.yaml`, `railway.json` y README de despliegue.
+- El importador no crea `PARTIDA` ni `CONCEPTO`; los materiales quedan como productos y cotizaciones del proveedor técnico.
+- El límite de filas del parser es configurable con `IMPORT_MAX_ROWS` (5000 por defecto).

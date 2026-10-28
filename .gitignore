@@ -4,3 +4,10 @@ node_modules/
 npm-debug.log*
 .DS_Store
 Thumbs.db
+
+# Archivos temporales de importacion (Tarea 2)
+uploads/*
+!uploads/.gitkeep
+!uploads/importaciones/
+uploads/importaciones/*
+!uploads/importaciones/.gitkeep

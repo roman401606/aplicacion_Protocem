@@ -9,7 +9,8 @@ const PAGES = {
   usuarios:     renderUsuarios,
   presupuesto:  renderPresupuesto,
   estimaciones: renderEstimaciones,
-  catalogo:     renderCatalogo
+  catalogo:     renderCatalogo,
+  importacion:  renderImportacion
 };
 
 let currentPage = 'dashboard';
@@ -17,6 +18,12 @@ let currentPage = 'dashboard';
 /* ===== NAVIGATE ===== */
 function navigate(page) {
   if (!PAGES[page]) return;
+
+  if (page === 'importacion' && (!API.user || API.user.rol !== 'administrador')) {
+    toast('Solo los administradores pueden importar desde Opus.', 'error');
+    return;
+  }
+
   currentPage = page;
 
   document.querySelectorAll('.nav-item').forEach(el => {
@@ -37,9 +44,9 @@ function initApp() {
   $('user-role').textContent  = user.rol.replace('_', ' ');
   $('user-avatar').textContent = (user.nombre || 'U')[0].toUpperCase();
 
-  if (user.rol === 'administrador') {
-    document.querySelectorAll('.nav-admin').forEach(el => el.classList.remove('hidden'));
-  }
+  document.querySelectorAll('.nav-admin').forEach(el => {
+    el.classList.toggle('hidden', user.rol !== 'administrador');
+  });
 
   initTooltips();
 

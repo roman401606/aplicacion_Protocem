@@ -68,6 +68,9 @@ module.exports = {
   publicDir: path.join(__dirname, 'public'),
   uploadsDir: path.join(__dirname, 'uploads'),
   uploadsMaxSize: toInt(process.env.UPLOADS_MAX_SIZE, 10 * 1024 * 1024),
+  importPreviewDir: path.join(__dirname, 'uploads', 'importaciones'),
+  importPreviewTtlMs: toInt(process.env.IMPORT_PREVIEW_TTL_MS, 60 * 60 * 1000),
+  importMaxRows: toInt(process.env.IMPORT_MAX_ROWS, 5000),
   bcryptRounds: toInt(process.env.BCRYPT_ROUNDS, 10),
   db: buildDatabaseConfig(),
   jwt: {

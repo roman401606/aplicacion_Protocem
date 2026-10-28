@@ -4,6 +4,32 @@ const config = require('../../config');
 
 const pool = mysql.createPool(config.db);
 
+/**
+ * Agrega 'borrador' al ENUM de PROYECTO.estado solo si aun no existe.
+ * Permite actualizar bases creadas antes de la Tarea 2 sin recrear tablas.
+ */
+async function ensureProyectoEstadoBorrador(conn) {
+  const [rows] = await conn.query(
+    `SELECT COLUMN_TYPE AS tipo
+       FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE()
+        AND TABLE_NAME = 'PROYECTO'
+        AND COLUMN_NAME = 'estado'`
+  );
+
+  if (!rows.length) return;
+
+  const tipo = String(rows[0].tipo || '').toLowerCase();
+  if (tipo.includes("'borrador'")) return;
+
+  await conn.query(
+    `ALTER TABLE PROYECTO
+       MODIFY estado ENUM('activo','pausado','finalizado','borrador')
+       NOT NULL DEFAULT 'activo'`
+  );
+  console.log('PROYECTO.estado actualizado: se agrego el valor borrador.');
+}
+
 async function initDB() {
   const c = await pool.getConnection();
   try {
@@ -28,7 +54,7 @@ async function initDB() {
       fecha_fin_estimada  DATE,
       presupuesto         DECIMAL(14,2) NOT NULL DEFAULT 0,
       porcentaje_avance   DECIMAL(5,2) NOT NULL DEFAULT 0.00,
-      estado              ENUM('activo','pausado','finalizado') NOT NULL DEFAULT 'activo',
+      estado              ENUM('activo','pausado','finalizado','borrador') NOT NULL DEFAULT 'activo',
       zona                ENUM('Norte','Frontera','Turístico','Centro','Sur') NOT NULL DEFAULT 'Centro',
       id_usuario          INT NOT NULL,
       PRIMARY KEY (id_proyecto),
@@ -253,6 +279,9 @@ async function initDB() {
       FOREIGN KEY (id_estimacion) REFERENCES ESTIMACION(id_estimacion) ON DELETE CASCADE,
       FOREIGN KEY (id_concepto)   REFERENCES CONCEPTO(id_concepto)
     ) ENGINE=InnoDB`);
+
+    /* Migracion idempotente: habilita el estado 'borrador' para importaciones. */
+    await ensureProyectoEstadoBorrador(c);
 
     /* ─── SEED DATA ─── */
     const [[{ cnt }]] = await c.query('SELECT COUNT(*) as cnt FROM USUARIO');

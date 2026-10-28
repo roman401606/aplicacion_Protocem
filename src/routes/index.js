@@ -16,5 +16,6 @@ router.use('/productos', require('./producto.routes'));
 router.use('/cotizaciones', require('./cotizacion.routes'));
 router.use('/proveedores', require('./proveedor.routes'));
 router.use('/usuarios', require('./usuario.routes'));
+router.use('/importacion', require('./importacion.routes'));
 
 module.exports = router;

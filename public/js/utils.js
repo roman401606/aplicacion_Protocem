@@ -112,7 +112,12 @@ function badge(cls, text) {
 }
 
 function estadoBadge(estado) {
-  const map = { activo: 'badge-green', pausado: 'badge-yellow', finalizado: 'badge-gray' };
+  const map = {
+    activo: 'badge-green',
+    pausado: 'badge-yellow',
+    finalizado: 'badge-gray',
+    borrador: 'badge-borrador'
+  };
   return badge(map[estado] || 'badge-gray', estado);
 }
 
