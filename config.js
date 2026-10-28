@@ -187,6 +187,7 @@ const corsOrigin = process.env.CORS_ORIGIN || '*';
 module.exports = {
   env,
   isProduction,
+  // Render inyecta PORT dinamicamente; 3000 se usa solo en local.
   port: toInt(process.env.PORT, 3000),
   publicDir: path.join(__dirname, 'public'),
   uploadsDir: path.join(__dirname, 'uploads'),

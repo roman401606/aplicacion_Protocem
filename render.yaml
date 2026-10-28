@@ -6,6 +6,8 @@
 #
 # Al sincronizar el Blueprint, Render pedira los valores marcados con
 # "sync: false" (DATABASE_URL y CORS_ORIGIN).
+#
+# No definir PORT aqui: Render lo inyecta dinamicamente en el servicio.
 
 services:
   - type: web
