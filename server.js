@@ -5,8 +5,8 @@ const app = require('./src/app');
 const { initDB } = require('./src/config/database');
 
 // Render asigna el puerto dinamicamente en process.env.PORT.
-// config.js lo normaliza; 3000 es solo el fallback para desarrollo local.
-const PORT = config.port;
+// 0.0.0.0 permite recibir trafico del balanceador de Render.
+const PORT = process.env.PORT || config.port || 3000;
 
 process.on('unhandledRejection', reason => {
   console.error('[unhandledRejection]', reason);
@@ -18,9 +18,9 @@ process.on('uncaughtException', error => {
 
 initDB()
   .then(() => {
-    app.listen(PORT, () => {
+    app.listen(PORT, '0.0.0.0', () => {
       console.log('\n=========================================');
-      console.log(' Protocem App escuchando en el puerto ' + PORT);
+      console.log(`Protocem App escuchando en el puerto ${PORT}`);
       console.log('=========================================');
       console.log(' Usuarios de prueba:');
       console.log('  admin@protocem.mx      / admin123');
