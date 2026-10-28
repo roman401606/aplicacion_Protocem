@@ -1,0 +1,44 @@
+# Render Blueprint para PROTOCEM.
+#
+# Render no ofrece MySQL administrado: su base de datos nativa es PostgreSQL.
+# Por eso este Blueprint solo crea el servicio web y espera que DATABASE_URL
+# apunte a un MySQL externo con SSL (PlanetScale, Aiven, Railway MySQL, etc.).
+#
+# Al sincronizar el Blueprint, Render pedira los valores marcados con
+# "sync: false" (DATABASE_URL y CORS_ORIGIN).
+
+services:
+  - type: web
+    name: protocem-app
+    runtime: node
+    plan: free
+    region: oregon
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /
+    autoDeployTrigger: commit
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: DB_SSL
+        value: "true"
+      - key: DB_SSL_REJECT_UNAUTHORIZED
+        value: "true"
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 8h
+      - key: CORS_ORIGIN
+        sync: false
+      - key: BCRYPT_ROUNDS
+        value: "10"
+      - key: UPLOADS_MAX_SIZE
+        value: "10485760"
+      - key: IMPORT_PREVIEW_TTL_MS
+        value: "3600000"
+      - key: IMPORT_MAX_ROWS
+        value: "5000"
+      - key: PUPPETEER_SKIP_DOWNLOAD
+        value: "true"

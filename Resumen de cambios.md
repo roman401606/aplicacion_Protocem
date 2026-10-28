@@ -1,12 +1,12 @@
 # Resumen de cambios — PROTOCEM
 
-> Documento acumulativo. Esta versión documenta las **Tareas 1, 2 y 3**. La Tarea 4 se agregará al finalizar.
+> Documento acumulativo. Esta versión documenta las **Tareas 1, 2, 3 y 4**.
 
 **Fecha:** 27 de octubre de 2026
 
 **Rama:** `develop`
 
-**Alcance de esta versión:** Tarea 1 — Refactorización a arquitectura MVC por capas; Tarea 2 — Importador de presupuestos Opus; Tarea 3 — Configuración de entorno local y nube.
+**Alcance de esta versión:** Tarea 1 — Refactorización a arquitectura MVC por capas; Tarea 2 — Importador de presupuestos Opus; Tarea 3 — Configuración de entorno local y nube; Tarea 4 — Archivos de despliegue y documentación final.
 
 ---
 
@@ -365,7 +365,7 @@ La base temporal fue eliminada al terminar.
 
 - **Tarea 2:** completada — importador Excel de Opus, `multer`, `xlsx`, `uploads/`, rutas `/api/importacion/*`, estado `borrador` y vista frontend.
 - **Tarea 3:** completada — `.env.example`, conexión por `DATABASE_URL` y SSL para nube.
-- **Tarea 4:** `Procfile`, `render.yaml`, `railway.json` y README de despliegue.
+- **Tarea 4:** completada — `Procfile`, `render.yaml`, `railway.json` y README de despliegue.
 
 ---
 
@@ -491,7 +491,7 @@ Todas las rutas usan `auth` + `requireRol('administrador')`. Sin token responden
 ### 11.9 Notas y pendientes
 
 - **Tarea 3:** completada — `.env.example`, conexión por `DATABASE_URL` y SSL para nube.
-- **Tarea 4:** `Procfile`, `render.yaml`, `railway.json` y README de despliegue.
+- **Tarea 4:** completada — `Procfile`, `render.yaml`, `railway.json` y README de despliegue.
 - El importador no crea `PARTIDA` ni `CONCEPTO`; los materiales quedan como productos y cotizaciones del proveedor técnico.
 - El límite de filas del parser es configurable con `IMPORT_MAX_ROWS` (5000 por defecto).
 
@@ -623,6 +623,118 @@ DATABASE_URL=mysql://usuario:contrasena@host:3306/protocem_db?ssl=true
 
 ### 12.9 Notas y pendientes
 
-- **Tarea 4:** `Procfile`, `render.yaml`, `railway.json` y README de despliegue.
+- **Tarea 4:** completada — `Procfile`, `render.yaml`, `railway.json` y README de despliegue.
 - En producción se recomienda `NODE_ENV=production`, `DB_SSL=true` y `CORS_ORIGIN` restringido.
 - Si el proveedor de nube entrega la URL con parámetros adicionales, solo se interpretan los relacionados con SSL; el resto se ignora.
+
+---
+
+## 13. Tarea 4 — Archivos de despliegue y documentación final
+
+### 13.1 Objetivo
+
+Cerrar el proyecto con los artefactos necesarios para desplegar la aplicación en plataformas PaaS y con un README único que permita instalar, ejecutar, entender y publicar el sistema.
+
+### 13.2 Archivos de despliegue creados
+
+| Archivo | Contenido | Uso |
+|---|---|---|
+| `Procfile` | `web: node server.js` | Plataformas compatibles con Procfile (Heroku o similares). |
+| `render.yaml` | Blueprint de Render con servicio web Node, build `npm ci`, start `npm start`, health check `/` y variables de producción. | Despliegue reproducible en Render. |
+| `railway.json` | Configuración de build y deploy para Railway con `RAILPACK`, `npm ci`, `npm start`, health check `/` y reinicio `ON_FAILURE`. | Despliegue en Railway. |
+
+**Render (`render.yaml`):**
+
+- Servicio `web` con runtime `node`, plan `free` y región `oregon`.
+- `buildCommand: npm ci` y `startCommand: npm start`.
+- `healthCheckPath: /` y `autoDeployTrigger: commit`.
+- `NODE_ENV=production`.
+- `DATABASE_URL` y `CORS_ORIGIN` como secretos solicitados al sincronizar (`sync: false`).
+- `JWT_SECRET` generado por Render (`generateValue: true`).
+- `DB_SSL=true` y `DB_SSL_REJECT_UNAUTHORIZED=true`.
+- Límites de importación y `BCRYPT_ROUNDS` explícitos.
+- `PUPPETEER_SKIP_DOWNLOAD=true` para no descargar Chromium en el build.
+
+> Render no ofrece MySQL administrado: su base nativa es PostgreSQL. El Blueprint no crea base de datos; `DATABASE_URL` debe apuntar a un MySQL externo con SSL (PlanetScale, Aiven, Railway MySQL u otro).
+
+**Railway (`railway.json`):**
+
+- Builder `RAILPACK`.
+- Build `npm ci` y start `npm start`.
+- Health check `/` con timeout de 300 segundos.
+- Reinicio automático `ON_FAILURE` hasta 10 intentos.
+
+**Procfile:**
+
+```text
+web: node server.js
+```
+
+### 13.3 README final
+
+Se reescribió `README.md` con:
+
+- Descripción del proyecto, cliente, asesor y equipo.
+- Características principales y roles.
+- Tecnologías y requisitos previos.
+- Instalación local paso a paso y creación de la base de datos.
+- Credenciales de prueba del seed.
+- Tabla completa de variables de entorno.
+- Conexión local con `DB_*` y conexión en nube con `DATABASE_URL`.
+- Comandos `npm install`, `npm start`, `npm run dev` y `npm test`.
+- Arquitectura MVC por capas y flujo de una petición.
+- Módulos principales y rutas de la API.
+- Flujo de importación desde Opus, endpoints y reglas.
+- Pruebas y cobertura funcional del parser.
+- Despliegue en Render y Railway paso a paso.
+- Estructura del repositorio, seguridad, solución de problemas, entregables y créditos.
+
+### 13.4 Decisiones de despliegue
+
+- **MySQL externo:** Render no ofrece MySQL administrado; la aplicación sigue usando MySQL mediante `DATABASE_URL`.
+- **SSL en la nube:** `DB_SSL=true` y validación de certificado activa por defecto.
+- **Secretos fuera del repositorio:** `DATABASE_URL`, `CORS_ORIGIN` y `JWT_SECRET` se configuran en el panel de cada plataforma; `.env` sigue ignorado.
+- **Puppeteer solo local:** se omite la descarga de Chromium en producción porque las capturas no forman parte del runtime.
+- **Almacenamiento efímero:** las vistas previas de importación viven en `uploads/importaciones`; se documenta que se pierden al reiniciar y que se requiere disco persistente o almacenamiento externo para conservarlas.
+- **Un solo servicio:** el frontend se sirve desde Express, por lo que no se despliega un servicio estático separado.
+
+### 13.5 Verificación final
+
+| Comprobación | Resultado |
+|---|---|
+| `node --check config.js` | OK |
+| `node --check src/config/database.js` | OK |
+| `node --check server.js` | OK |
+| `node --check src/app.js` | OK |
+| `railway.json` parseado con `JSON.parse` | OK |
+| Contenido exacto de `Procfile` | `web: node server.js` |
+| `render.yaml` parseado con `js-yaml` | YAML válido: servicio web Node, build, start y health check presentes |
+| `npm test` | **25/25** |
+| Arranque real en el puerto 3103 | `GET /` → 200 |
+| Login real con `admin@protocem.mx` | Token emitido, rol `administrador` |
+| Puerto 3103 después de la prueba | Libre |
+| `git diff --check` | Sin errores |
+
+### 13.6 Estado final del proyecto
+
+| Tarea | Estado | Commit |
+|---|---|---|
+| Tarea 1 — Arquitectura MVC por capas | Completada | `66e7fc9` |
+| Tarea 2 — Importador de presupuestos Opus | Completada | `88a8a15` |
+| Tarea 3 — Configuración de entorno local y nube | Completada | `f85cb39` |
+| Tarea 4 — Despliegue y documentación final | Completada | Commit de cierre de esta tarea |
+
+**Resultado:**
+
+- Backend Express organizado en rutas, controladores, servicios, repositorios y configuración.
+- Frontend SPA servido por el mismo proceso.
+- MySQL local o en nube, con SSL y `DATABASE_URL`.
+- Importación de presupuestos Opus con vista previa y confirmación transaccional.
+- 25 pruebas automatizadas del parser.
+- Archivos de despliegue para Render y Railway, más `Procfile` para plataformas compatibles.
+- README y resumen de cambios actualizados.
+- `.env` fuera del control de versiones; solo se versiona `.env.example`.
+
+### 13.7 Cierre
+
+Con la Tarea 4 se cierra el alcance solicitado. El repositorio queda en la rama `develop`, con las cuatro tareas completadas, un commit atómico por tarea y el árbol de trabajo limpio. Los pasos pendientes para una puesta en producción real son externos al código: crear el MySQL administrado, configurar los secretos en la plataforma, generar el dominio público, cambiar las contraseñas del seed y, si se requiere persistencia de vistas previas, montar un disco o almacenamiento externo.
